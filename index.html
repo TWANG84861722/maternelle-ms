@@ -701,15 +701,23 @@ function stateCode(){return 'CIVIQUE1:'+btoa(unescape(encodeURIComponent(packSta
 function unpack(txt){
   txt=String(txt||'').trim();
   let j;
-  if(txt.startsWith('CIVIQUE1:'))j=decodeURIComponent(escape(atob(txt.slice(9).replace(/\s+/g,''))));
+  // 允许码前后有别的文字、中间被折行（微信、备忘录里常见）：去掉空白后找码，末尾多出的字母逐步裁掉
+  const mm=txt.replace(/\s+/g,'').match(/CIVIQUE1:([A-Za-z0-9+\/=]+)/);
+  if(mm){const b=mm[1];
+    for(let n=b.length-b.length%4;n>0&&n>=b.length-24;n-=4){
+      try{let t=decodeURIComponent(escape(atob(b.slice(0,n))));t=t.slice(0,t.lastIndexOf('}')+1);JSON.parse(t);j=t;break}catch(e){}
+    }
+    if(j===undefined)throw new Error('bad');
+  }
   else j=txt;
   const o=JSON.parse(j);
   if(!o||o.app!=='maternelle-ms'||!o.state)throw new Error('Ce n’est pas un code Maternelle');
   return o;
 }
 function importState(txt){
-  let o;try{o=unpack(txt)}catch(e){const m=e&&e.message||'';return 'Lecture impossible : '+(/Civique/.test(m)?m:'code incomplet ou mal formé')+'. Vérifiez que le code est complet (il commence par CIVIQUE1:).'}
-  const before=knownAll();S=merge(S,o.state);save();
+  let o;try{o=unpack(txt)}catch(e){const m=e&&e.message||'';return 'Lecture impossible : '+(/Civique|n’est pas|\u4e0d\u662f/.test(m)?m:'code incomplet ou mal formé')+'. Vérifiez que le code est complet (il commence par CIVIQUE1:).'}
+  // 手动导入时忽略本机以前的「重置」标记，否则导入的进度会被悄悄丢掉
+  const before=knownAll();const loc=Object.assign({},S);delete loc.resetAt;S=merge(loc,o.state);save();
   return `Import réussi, fusionné avec la progression de cet appareil. Questions maîtrisées : ${before} → ${knownAll()}.`;
 }
 // 持久保存：请浏览器不要自动清除本站数据（Claude 版有账号同步，不需要）
@@ -1029,7 +1037,7 @@ function finishExam(){
 /* ============ 反馈问题：GitHub Issue / 邮件 / 复制发微信 ============ */
 const REPO='https://github.com/TWANG84861722/maternelle-ms';
 const MAIL=['twang8496','gmail.com'].join('@');   // 运行时拼出，减少被抓取
-const BUILD='2026-10-17 15:40 maternelle-ms';
+const BUILD='2026-10-24 11:07 maternelle-ms';
 const FB_TYPES=['Audio mal prononcé','Réponse fausse','Explication erronée','Bug','Suggestion','Autre'];
 let FB=null;
 function openFeedback(qid){FB={qid:qid||null,type:qid?'Audio mal prononcé':'Bug',text:''};drawFeedback()}
